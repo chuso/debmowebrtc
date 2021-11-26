@@ -9,6 +9,7 @@
         <div>
             <button id="startButton">Start</button>
             <button id="callButton">Call</button>
+            <input id="stunCheckbox" type="checkbox" /><label for="stun">Enable stun</label>
         </div>
         <pre id="outputMessageContainer" style="white-space: pre-wrap"></pre>
         <script>
@@ -19,6 +20,10 @@ const outputMessage = {
     media: null,
     iceCandidates: []
 };
+
+function resetIceCandidates() {
+    outputMessage.iceCandidates = [];
+}
 
 function updateOutputMessage(media, iceCandidate) {    
     if (media) {
@@ -41,7 +46,13 @@ async function startAction() {
 }
 
 async function callAction() {
-    const servers = null;  // Allows for RTC server configuration.
+    resetIceCandidates();
+    const isStunEnabled = document.getElementById('stunCheckbox').checked;
+    const servers = isStunEnabled ? {
+            iceServers: [
+                { urls: 'stun:meet-jit-si-turnrelay.jitsi.net:443' }
+            ]
+        } : null;
     localPeerConnection = new RTCPeerConnection(servers);
     // Whenever a new ICE candidate is ready, this event will be fired
     localPeerConnection.addEventListener('icecandidate', handleConnection);
@@ -86,4 +97,3 @@ inputMessageContainer.addEventListener('change', connectToRemotePeer);
         </script>
     </body>
 </html>
-
