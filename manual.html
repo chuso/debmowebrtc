@@ -1,0 +1,89 @@
+<html>
+    <head>
+        <style>video { max-width: 100%;width: 320px; border: 1px solid black; }</style>
+    </head>
+    <body>
+        <video id="localVideo" autoplay playsinline></video>
+        <video id="remoteVideo" autoplay playsinline></video>
+        <textarea id="inputMessageContainer" style="width: auto; height:100px;"></textarea>
+        <div>
+            <button id="startButton">Start</button>
+            <button id="callButton">Call</button>
+        </div>
+        <pre id="outputMessageContainer" style="white-space: pre-wrap"></pre>
+        <script>
+const startButton = document.getElementById('startButton');
+const callButton = document.getElementById('callButton');
+const outputMessageContainer = document.getElementById('outputMessageContainer');
+const outputMessage = {
+    media: null,
+    iceCandidates: []
+};
+
+function updateOutputMessage(media, iceCandidate) {    
+    if (media) {
+        outputMessage.media = media;
+    }
+    if (iceCandidate) {
+        outputMessage.iceCandidates.push(iceCandidate.candidate);
+    }
+    outputMessageContainer.innerHTML = JSON.stringify(outputMessage, null, 4);
+}
+
+let localStream;
+let localPeerConnection;
+
+async function startAction() {
+    startButton.disabled = true;
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    localVideo.srcObject = localStream;
+    callButton.disabled = false;
+}
+
+async function callAction() {
+    const servers = null;  // Allows for RTC server configuration.
+    localPeerConnection = new RTCPeerConnection(servers);
+    // Whenever a new ICE candidate is ready, this event will be fired
+    localPeerConnection.addEventListener('icecandidate', handleConnection);
+    localPeerConnection.addStream(localStream);
+    const offerDescription = await localPeerConnection.createOffer({ offerToReceiveVideo: 1 });
+    localPeerConnection.setLocalDescription(offerDescription);
+    localPeerConnection.addEventListener('addstream', ({stream}) => remoteVideo.srcObject = stream);
+    updateOutputMessage(offerDescription);
+}
+
+function handleConnection(event) {
+    const iceCandidate = event.candidate;
+    if (iceCandidate) {
+        updateOutputMessage(null, iceCandidate);
+    }
+}
+
+async function connectToRemotePeer() {
+    const message = JSON.parse(inputMessageContainer.value);
+    const description = new RTCSessionDescription(message.media);
+    localPeerConnection.setRemoteDescription(description);
+
+    if (message.media.type === 'offer') {
+        const answerDescription = await localPeerConnection.createAnswer();
+        localPeerConnection.setLocalDescription(answerDescription);
+        updateOutputMessage(answerDescription);
+    }
+    message.iceCandidates.forEach(iceCandidate => {
+        const newIceCandidate = new RTCIceCandidate({
+            sdpMLineIndex: 0,
+            candidate: iceCandidate
+        });
+        localPeerConnection.addIceCandidate(newIceCandidate);
+    });
+}
+
+callButton.disabled = true;
+outputMessageContainer.disabled = true;
+startButton.addEventListener('click', startAction);
+callButton.addEventListener('click', callAction);
+inputMessageContainer.addEventListener('change', connectToRemotePeer);
+        </script>
+    </body>
+</html>
+
